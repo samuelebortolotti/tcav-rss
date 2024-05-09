@@ -15,7 +15,10 @@ else:
 
 
 def directional_derivative(model, cav, layer_name, class_name):
+    # gradients of the model's output with respect to the specified class and layer. 
+    # These gradients indicate how changes in the input features affect the output of the model for the specified class.
     gradient = model.generate_gradients(class_name, layer_name).reshape(-1)
+    # The dot product measures the similarity between two vectors. If the dot product is negative, it suggests that the gradient points in the opposite direction of the CAV
     return np.dot(gradient, cav) < 0
 
 
@@ -49,7 +52,7 @@ class TCAV(object):
         self.output_dir = 'output'
         self.max_samples = max_samples
         self.lr = 1e-3
-        self.model_type = 'logistic'
+        self.model_type = 'linear'
         self.class_list = class_list
 
     def generate_activations(self, layer_names):

@@ -3,7 +3,7 @@ from torch.optim import Adam
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from models import Resnet18
+from models import SimpleNet
 from tcav import TCAV
 from model_wrapper import ModelWrapper
 from mydata import MyDataset, ValidateDataset
@@ -21,7 +21,7 @@ def data_loader(base_path):
 def train():
     best_weights = model.state_dict()
     best_acc = 0.0
-    for epoch in range(200):
+    for epoch in range(10):
         # test phase
         total = 0
         score = 0
@@ -30,6 +30,7 @@ def train():
             for inputs, labels in testloader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 outputs = model(inputs)
+                outputs = torch.softmax(outputs, dim=1)
                 predicted = outputs.max(dim=1)[1]
                 total += labels.size(0)
                 score += predicted.eq(labels).sum().item()
@@ -46,18 +47,19 @@ def train():
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
+
             loss.backward()
             optimizer.step()
 
     # save model parameters
-    torch.save(best_weights, 'resnet18_office.pth')
+    torch.save(best_weights, 'best.pth')
 
 
 def validate(model):
     model.eval()
-    weights = torch.load('../resnet18_office.pth')
+    weights = torch.load('best.pth')
     model.load_state_dict(weights)
-    extract_layer = 'feature_layers'
+    extract_layer = 'fc2'
     model = ModelWrapper(model, [extract_layer])
 
     scorer = TCAV(model, validloader, concept_dict, class_dict.values(), 150)
@@ -70,8 +72,8 @@ def validate(model):
     print('Calculating TCAV scores...')
     scorer.generate_cavs(extract_layer)
     scorer.calculate_tcav_score(extract_layer, 'output/tcav_result.npy')
-    scores = np.load('output/tcav_result.npy')
-    scores = scores.T.tolist()
+    loaded_scores = np.load('output/tcav_result.npy')
+    scores = loaded_scores.T.tolist()
     print('Done!')
 
     table = pt.PrettyTable()
@@ -90,24 +92,26 @@ if __name__ == "__main__":
         device = torch.device("cpu")
 
     data_transforms = transforms.Compose([
-        transforms.Resize([128, 128]),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     ])
 
-    image_dataset = datasets.ImageFolder('../data/amazon', data_transforms)
-    train_size = int(len(image_dataset) * 0.8)
-    train_data, test_data = torch.utils.data.random_split(image_dataset, [train_size, len(image_dataset) - train_size])
+    dataset = datasets.MNIST(root='../data', train=True, download=True, transform=data_transforms)
+    train_size = int(len(dataset) * 0.8)
+    train_data, test_data = torch.utils.data.random_split(dataset, [train_size, len(dataset) - train_size])
     trainloader = DataLoader(train_data, batch_size=128, shuffle=True, num_workers=8)
     testloader = DataLoader(test_data, batch_size=256, shuffle=False, num_workers=4)
 
     class_dict = {
-        'bike': 1,
-        'calculator': 5,
-        'desk_chair': 6,
-        'headphones': 10,
-        'laptop_computer': 12,
-        'phone': 20
+        'zero': 0,
+        'one': 1,
+        'two': 2,
+        'three': 3,
+        'four': 4,
+        'five': 5,
+        'six': 6,
+        'seven': 7,
+        'eigth': 8,
+        'nine': 9,
     }
 
     reverse_class_dict = {v : k for k, v in class_dict.items()}
@@ -121,10 +125,10 @@ if __name__ == "__main__":
         if os.path.isdir(fullpath):
             concept_dict[dirname] = data_loader(fullpath)
 
-    model = Resnet18(output_num=31)
+    model = SimpleNet()
     model = model.to(device)
     criterion = CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=0.0001)
+    optimizer = Adam(model.parameters(), lr=0.001)
 
-    # train()
+    train()
     validate(model)
