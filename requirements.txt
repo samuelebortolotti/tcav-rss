@@ -1,0 +1,9 @@
+torch
+numpy
+h5py
+tqdm
+pillow
+torchvision
+prettytable
+scikit-learn
+matplotlib
